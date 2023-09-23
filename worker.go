@@ -35,17 +35,19 @@ func handleRunningInstance(instance *HostInstance, user *User, db *Database) {
 		// Remove 1 credit (1 minute)
 		user.HostingCredit--
 
-		// Update the user in the database
-		if err := db.SaveUser(user); err != nil {
-			fmt.Println("Error updating user:", err)
-		}
-
 		// Check if the user has enough credit
 		if user.HostingCredit <= 0 {
 			// User doesn't have enough credit ==> Stop the instance
 			instance.Stop()
 
+			user.IsHosting = false
+
 			fmt.Println("Stopping instance for user:", user.Username)
+		}
+
+		// Update the user in the database
+		if err := db.SaveUser(user); err != nil {
+			fmt.Println("Error updating user:", err)
 		}
 	}
 

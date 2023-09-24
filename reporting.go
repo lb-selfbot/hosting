@@ -21,7 +21,7 @@ func reportTooManyErrors(user *User) {
 		Level:   sentry.LevelError,
 		Message: "Too many errors",
 		User:    sentry.User{ID: user.Username, Name: user.Username},
-		Extra: map[string]interface{}{
+		Extra: map[string]any{
 			"user_id":  user.ID,
 			"username": user.Username,
 		},

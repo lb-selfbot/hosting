@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync/atomic"
+	"time"
 )
 
 type HostInstance struct {
@@ -15,6 +16,14 @@ type HostInstance struct {
 	Cmd         *exec.Cmd
 
 	Token string
+
+	Stdout string
+
+	// Sliding window for errors
+	Errors      int
+	MaxErrors   int
+	ErrorStart  time.Time
+	ErrorWindow time.Duration
 }
 
 func (h *HostInstance) handler() {
@@ -50,8 +59,9 @@ func (h *HostInstance) handler() {
 		return
 	}
 
-	processKilled := make(chan struct{})
-	stdout := ""
+	processKilled := make(chan int)
+
+	h.Stdout = ""
 
 	go func() {
 		for {
@@ -60,20 +70,31 @@ func (h *HostInstance) handler() {
 				break
 			}
 
-			stdout += stdoutData
+			h.Stdout += stdoutData
 		}
 		h.Cmd.Wait()
-		processKilled <- struct{}{}
+		processKilled <- h.Cmd.ProcessState.ExitCode()
 	}()
 
 	select {
 	case <-h.StopChannel:
-		fmt.Println("Stopping bot for user:", h.User.Username)
+		fmt.Println("Gracefully stopping bot for user:", h.User.Username)
 		h.Cmd.Process.Kill()
 
 		return
-	case <-processKilled:
-		fmt.Println("Bot for user", h.User.Username, "has exited:", stdout, h.Cmd.ProcessState.ExitCode())
+	case exitCode := <-processKilled:
+		fmt.Println("Bot for user", h.User.Username, "has exited:", h.Stdout, "with status code", exitCode)
+
+		if exitCode != 0 {
+			h.Errors++
+
+			if time.Since(h.ErrorStart) > h.ErrorWindow {
+				h.ErrorStart = time.Now()
+				h.Errors = 1
+			}
+
+			reportError(h.User, h.Stdout, exitCode)
+		}
 
 		return
 	}
@@ -88,7 +109,9 @@ func (h *HostInstance) Run(token string) {
 }
 
 func (h *HostInstance) Stop() {
-	h.StopChannel <- struct{}{}
+	if h.IsRunning() {
+		h.StopChannel <- struct{}{}
+	}
 }
 
 func (h *HostInstance) IsRunning() bool {
@@ -107,6 +130,9 @@ func GetHostInstance(user *User) *HostInstance {
 		User:        user,
 		Locker:      atomic.Uint32{},
 		StopChannel: make(chan struct{}),
+		MaxErrors:   5,
+		ErrorStart:  time.Now(),
+		ErrorWindow: time.Minute * 10,
 	}
 
 	return Instances[user.ID]

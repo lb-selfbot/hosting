@@ -22,9 +22,29 @@ func worker(db *Database) {
 			} else {
 				handleStoppedInstance(instance, user, db)
 			}
+
+			handleErrors(instance, user, db)
 		}
 
 		time.Sleep(time.Second * 5)
+	}
+}
+
+func handleErrors(instance *HostInstance, user *User, db *Database) {
+	if instance.Errors > instance.MaxErrors && user.IsHosting {
+		// Too many errors ==> Stop the instance
+		instance.Stop()
+
+		user.IsHosting = false
+
+		// Update the user in the database
+		if err := db.SaveUser(user); err != nil {
+			fmt.Println("Error updating user:", err)
+		}
+		
+		reportTooManyErrors(user)
+
+		fmt.Println("Stopping instance for user (too many errors):", user.Username)
 	}
 }
 

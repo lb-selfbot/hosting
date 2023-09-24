@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 
+	"github.com/getsentry/sentry-go"
 	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/joho/godotenv"
@@ -20,6 +22,15 @@ func main() {
 	if err := godotenv.Load(); err != nil {
 		fmt.Println("Error loading .env file:", err)
 		os.Exit(1)
+	}
+
+	// Setup sentry
+	err := sentry.Init(sentry.ClientOptions{
+		Dsn: os.Getenv("SENTRY_DSN"),
+		TracesSampleRate: 1.0,
+	})
+	if err != nil {
+		log.Fatalf("sentry.Init: %s", err)
 	}
 
 	// Setup database

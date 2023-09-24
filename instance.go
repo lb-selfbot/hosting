@@ -80,7 +80,9 @@ func (h *HostInstance) handler() {
 }
 
 func (h *HostInstance) Run(token string) {
-	h.Token = token
+	if token != "" {
+		h.Token = token
+	}
 
 	go h.handler()
 }

@@ -26,7 +26,7 @@ func worker(db *Database) {
 			handleErrors(instance, user, db)
 		}
 
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Second * 60)
 	}
 }
 

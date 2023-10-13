@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"time"
+	"unicode"
 )
 
 type HostInstance struct {
@@ -26,6 +28,12 @@ type HostInstance struct {
 	ErrorWindow time.Duration
 }
 
+func (h *HostInstance) cleanFilename(filename string) string {
+	return strings.TrimFunc(filename, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsNumber(r)
+	})
+}
+
 func (h *HostInstance) handler() {
 	if !h.Locker.CompareAndSwap(0, 1) {
 		return
@@ -35,7 +43,7 @@ func (h *HostInstance) handler() {
 	fmt.Println("Running bot for user:", h.User.Username)
 
 	// Set main folder
-	mainFolder := filepath.Join("/hosting", h.User.Username, "LightningBot")
+	mainFolder := filepath.Join("/hosting", fmt.Sprintf("%s-%d", h.cleanFilename(h.User.Username), h.User.ID), "LightningBot")
 
 	// RUn the executable
 	h.Cmd = exec.Command("./LB-Selfbot")
@@ -102,7 +110,12 @@ func (h *HostInstance) handler() {
 
 func (h *HostInstance) Run(token string) {
 	if token != "" {
-		h.Token = token
+		var err error
+		h.Token, err = decrypt(token)
+		if err != nil {
+			fmt.Println("Error decrypting token:", err)
+			return
+		}
 	}
 
 	go h.handler()

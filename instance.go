@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -45,13 +46,17 @@ func (h *HostInstance) handler() {
 	// Set main folder
 	mainFolder := filepath.Join("/hosting", fmt.Sprintf("%s-%d", h.cleanFilename(h.User.Username), h.User.ID), "LightningBot")
 
-	// RUn the executable
+	// Run the executable
 	h.Cmd = exec.Command("./LB-Selfbot")
 	h.Cmd.Env = append(h.Cmd.Env, fmt.Sprintf("USERNAME=%s", h.User.Username))
 	h.Cmd.Env = append(h.Cmd.Env, fmt.Sprintf("PASSWORD=%s", "s]+zs,p7+X2eWY$gJ90£DjZ}RlWjk21*sbY<lE)VTWy5b!N'"))
 	h.Cmd.Env = append(h.Cmd.Env, fmt.Sprintf("TOKEN=%s", h.Token))
 	h.Cmd.Env = append(h.Cmd.Env, fmt.Sprintf("MAIN_FOLDER=%s", mainFolder))
-	// h.Cmd.Stdout
+
+	// Set proxy in prod
+	if runtime.GOOS != "windows" {
+		h.Cmd.Env = append(h.Cmd.Env, "HTTP_PROXY=127.0.0.1:5000")
+	}
 
 	stdoutPipe, err := h.Cmd.StdoutPipe()
 	if err != nil {

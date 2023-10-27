@@ -1,0 +1,55 @@
+name: CD Workflow
+on: [workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: "1.21.3"
+
+      - name: Setup Golang caches
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-golang-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-golang-
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install gcc-multilib
+
+      - name: Build Hosting
+        env:
+          GOPROXY: "https://proxy.golang.org"
+          CGO_ENABLED: 0
+          GOOS: "linux"
+        run: go build -trimpath -ldflags "-s -w" -o LB-Hosting
+
+      - name: Install SSH Key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          known_hosts: ${{ secrets.KNOWN_HOSTS }}
+
+      - name: Upload to server
+        run: rsync -a LB-Hosting ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/hosting/LB-Hosting
+
+      - name: Restart service
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            sudo systemctl restart lightningbot-hosting

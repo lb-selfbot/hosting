@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"os/exec"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -34,6 +36,43 @@ func (h *HostInstance) cleanFilename(filename string) string {
 	})
 }
 
+func (h *HostInstance) userExists(username string) bool {
+	cmd := exec.Command("id", "-u", username)
+	err := cmd.Run()
+	return err == nil
+}
+
+func (h *HostInstance) getUIDGID(username string) (int64, int64, error) {
+	u, err := user.Lookup(username)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	uid, err := strconv.ParseInt(u.Uid, 10, 32)
+	if err != nil {
+		return 0, 0, err
+	}
+	gid, err := strconv.ParseInt(u.Gid, 10, 32)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return uid, gid, nil
+}
+
+func (h *HostInstance) createUser(username, home string) (int64, int64, error) {
+	if h.userExists(username) {
+		return h.getUIDGID(username)
+	}
+
+	cmd := exec.Command("useradd", "-m", "-d", home, username)
+	if err := cmd.Run(); err != nil {
+		return 0, 0, err
+	}
+
+	return h.getUIDGID(username)
+}
+
 func (h *HostInstance) handler() {
 	if !h.Locker.CompareAndSwap(0, 1) {
 		return
@@ -42,11 +81,18 @@ func (h *HostInstance) handler() {
 
 	fmt.Println("Running bot for user:", h.User.Username)
 
-	// Set main folder
-	mainFolder := filepath.Join("/hosting", fmt.Sprintf("%s-%d", h.cleanFilename(h.User.Username), h.User.ID), "LightningBot")
+	// Setup user
+	username := fmt.Sprintf("%s-%d", h.cleanFilename(h.User.Username), h.User.ID)
+	uid, gid, err := h.createUser(username, "/hosting")
+	if err != nil {
+		fmt.Println("Error creating user:", err)
+		return
+	}
+	mainFolder := filepath.Join("/hosting", username, "LightningBot")
 
 	// Run the executable
 	h.Cmd = exec.Command("./LB-Selfbot")
+	setupCmd(h.Cmd, uid, gid)
 	h.Cmd.Env = append(h.Cmd.Env, fmt.Sprintf("USERNAME=%s", h.User.Username))
 	h.Cmd.Env = append(h.Cmd.Env, fmt.Sprintf("PASSWORD=%s", "s]+zs,p7+X2eWY$gJ90£DjZ}RlWjk21*sbY<lE)VTWy5b!N'"))
 	h.Cmd.Env = append(h.Cmd.Env, fmt.Sprintf("TOKEN=%s", h.Token))

@@ -83,7 +83,7 @@ func (h *HostInstance) handler() {
 
 	// Setup user
 	username := fmt.Sprintf("%s-%d", h.cleanFilename(h.User.Username), h.User.ID)
-	uid, gid, err := h.createUser(username, "/hosting")
+	uid, gid, err := h.createUser(username, filepath.Join("/hosting", username))
 	if err != nil {
 		fmt.Println("Error creating user:", err)
 		return

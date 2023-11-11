@@ -8,10 +8,11 @@ import (
 )
 
 type User struct {
-	ID            int
-	Username      string
-	IsHosting     bool
-	HostingCredit int // In minutes
+	ID              int
+	Username        string
+	IsHosting       bool
+	HostingCredit   int // In minutes
+	HostingLifetime bool
 }
 
 type Database struct {
@@ -44,7 +45,7 @@ func (db *Database) Connect() (err error) {
 }
 
 func (db *Database) GetUsers() (users []*User, err error) {
-	rows, err := db.Conn.Query("SELECT id, username, is_hosting, hosting_credit FROM api_user")
+	rows, err := db.Conn.Query("SELECT id, username, is_hosting, hosting_credit, hosting_lifetime FROM api_user")
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +53,7 @@ func (db *Database) GetUsers() (users []*User, err error) {
 	for rows.Next() {
 		var u User
 
-		if err := rows.Scan(&u.ID, &u.Username, &u.IsHosting, &u.HostingCredit); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.IsHosting, &u.HostingCredit, &u.HostingLifetime); err != nil {
 			panic(err)
 		}
 

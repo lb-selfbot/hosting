@@ -41,7 +41,7 @@ func handleErrors(instance *HostInstance, user *User, db *Database) {
 		if err := db.SaveUser(user); err != nil {
 			fmt.Println("Error updating user:", err)
 		}
-		
+
 		reportTooManyErrors(user)
 
 		fmt.Println("Stopping instance for user (too many errors):", user.Username)
@@ -50,24 +50,26 @@ func handleErrors(instance *HostInstance, user *User, db *Database) {
 
 func handleRunningInstance(instance *HostInstance, user *User, db *Database) {
 	if user.IsHosting {
-		fmt.Println("User", user.Username, "is hosting, credit:", user.HostingCredit)
+		fmt.Println("User", user.Username, "is hosting, credit:", user.HostingCredit, "lifetime:", user.HostingLifetime)
 
-		// Remove 1 credit (1 minute)
-		user.HostingCredit--
+		if !user.HostingLifetime {
+			// Remove 1 credit (1 minute)
+			user.HostingCredit--
 
-		// Check if the user has enough credit
-		if user.HostingCredit <= 0 {
-			// User doesn't have enough credit ==> Stop the instance
-			instance.Stop()
+			// Check if the user has enough credit
+			if user.HostingCredit <= 0 {
+				// User doesn't have enough credit ==> Stop the instance
+				instance.Stop()
+	
+				user.IsHosting = false
+	
+				fmt.Println("Stopping instance for user:", user.Username)
+			}
 
-			user.IsHosting = false
-
-			fmt.Println("Stopping instance for user:", user.Username)
-		}
-
-		// Update the user in the database
-		if err := db.SaveUser(user); err != nil {
-			fmt.Println("Error updating user:", err)
+			// Update the user in the database
+			if err := db.SaveUser(user); err != nil {
+				fmt.Println("Error updating user:", err)
+			}
 		}
 	}
 
@@ -81,7 +83,7 @@ func handleRunningInstance(instance *HostInstance, user *User, db *Database) {
 
 func handleStoppedInstance(instance *HostInstance, user *User, db *Database) {
 	// If the instance is not running and the user is hosting, start the instance
-	if user.IsHosting && user.HostingCredit > 0 {
+	if user.IsHosting && (user.HostingCredit > 0 || user.HostingLifetime) {
 		token, err := db.GetUserToken(user)
 		if err != nil {
 			fmt.Println("Error getting user token:", err)

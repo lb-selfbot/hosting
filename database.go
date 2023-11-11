@@ -73,13 +73,13 @@ func (db *Database) GetUserToken(user *User) (string, error) {
 
 	for rows.Next() {
 		if err := rows.Scan(&token); err != nil {
-			panic(err)
+			return "", err
 		}
 	}
 
-	_, err = db.Conn.Exec("UPDATE api_user SET hosting_token = ? WHERE id = ?", "", user.ID)
+	// _, err = db.Conn.Exec("UPDATE api_user SET hosting_token = ? WHERE id = ?", "", user.ID)
 
-	return token, err
+	return token, nil
 }
 
 func (db *Database) SaveUser(user *User) error {

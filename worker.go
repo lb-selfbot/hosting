@@ -35,6 +35,11 @@ func handleErrors(instance *HostInstance, user *User, db *Database) {
 		// Too many errors ==> Stop the instance
 		instance.Stop()
 
+		// Reset the error counter
+		instance.Errors = 0
+		instance.ErrorStart = time.Now()
+
+		// Set the user to not hosting
 		user.IsHosting = false
 
 		// Update the user in the database

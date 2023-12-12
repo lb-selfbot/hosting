@@ -6,11 +6,11 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
-	"unicode"
 )
 
 type HostInstance struct {
@@ -31,9 +31,22 @@ type HostInstance struct {
 }
 
 func (h *HostInstance) cleanFilename(filename string) string {
-	return strings.TrimFunc(filename, func(r rune) bool {
-		return !unicode.IsLetter(r) && !unicode.IsNumber(r)
-	})
+	// Replace invalid characters with underscores
+	re := regexp.MustCompile(`[^a-zA-Z0-9\._-]`)
+	cleaned := re.ReplaceAllString(filename, "_")
+
+	// Remove leading and trailing underscores
+	cleaned = strings.Trim(cleaned, "_")
+
+	// Remove leading dot (if any)
+	cleaned = strings.TrimPrefix(cleaned, ".")
+
+	// Make sure the result is not "." or ".."
+	if cleaned == "" || cleaned == "." || cleaned == ".." {
+		cleaned = "_"
+	}
+
+	return cleaned
 }
 
 func (h *HostInstance) userExists(username string) bool {

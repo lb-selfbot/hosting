@@ -1,8 +1,18 @@
 package main
 
-import "github.com/getsentry/sentry-go"
+import (
+	"strings"
+
+	"github.com/getsentry/sentry-go"
+)
 
 func reportError(user *User, stdout string, exitCode int) {
+	// Truncate stdout to last 100 lines
+	lines := strings.Split(stdout, "\n")
+	if len(lines) > 100 {
+		stdout = strings.Join(lines[len(lines)-100:], "\n")
+	}
+
 	sentry.CaptureEvent(&sentry.Event{
 		Level:   sentry.LevelError,
 		Message: "Bot exited with non-zero exit code",

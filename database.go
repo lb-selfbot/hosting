@@ -78,8 +78,6 @@ func (db *Database) GetUserToken(user *User) (string, error) {
 		}
 	}
 
-	// _, err = db.Conn.Exec("UPDATE api_user SET hosting_token = ? WHERE id = ?", "", user.ID)
-
 	return token, nil
 }
 

@@ -6,7 +6,7 @@ import (
 	"github.com/getsentry/sentry-go"
 )
 
-func reportError(user *User, stdout string, exitCode int) {
+func reportError(user *User, stdout string, containerState string) {
 	// Truncate stdout to last 100 lines
 	lines := strings.Split(stdout, "\n")
 	if len(lines) > 100 {
@@ -20,7 +20,7 @@ func reportError(user *User, stdout string, exitCode int) {
 		Extra: map[string]any{
 			"user_id":   user.ID,
 			"username":  user.Username,
-			"exit_code": exitCode,
+			"container_state": containerState,
 			"stdout":    stdout,
 		},
 	})

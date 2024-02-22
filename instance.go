@@ -1,27 +1,23 @@
 package main
 
 import (
-	"bufio"
+	"bytes"
+	"context"
 	"fmt"
-	"os/exec"
-	"os/user"
-	"path/filepath"
-	"regexp"
-	"strconv"
-	"strings"
-	"sync/atomic"
 	"time"
+
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/client"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type HostInstance struct {
-	User        *User
-	Locker      atomic.Uint32
-	StopChannel chan struct{}
-	Cmd         *exec.Cmd
-
-	Token string
-
-	Stdout string
+	DockerClient *client.Client
+	User         *User
+	Token        string
 
 	// Sliding window for errors
 	Errors      int
@@ -30,140 +26,87 @@ type HostInstance struct {
 	ErrorWindow time.Duration
 }
 
-func (h *HostInstance) cleanFilename(filename string) string {
-	// Replace invalid characters with underscores
-	re := regexp.MustCompile(`[^a-zA-Z0-9\._-]`)
-	cleaned := re.ReplaceAllString(filename, "_")
-
-	// Remove leading and trailing underscores
-	cleaned = strings.Trim(cleaned, "_")
-
-	// Remove leading dot (if any)
-	cleaned = strings.TrimPrefix(cleaned, ".")
-
-	// Make sure the result is not "." or ".."
-	if cleaned == "" || cleaned == "." || cleaned == ".." {
-		cleaned = "_"
-	}
-
-	return cleaned
+func (h *HostInstance) containerName() string {
+	return fmt.Sprintf("lightningbot-hosting-%d", h.User.ID)
 }
 
-func (h *HostInstance) userExists(username string) bool {
-	cmd := exec.Command("id", "-u", username)
-	err := cmd.Run()
-	return err == nil
-}
-
-func (h *HostInstance) getUIDGID(username string) (int64, int64, error) {
-	u, err := user.Lookup(username)
+func (h *HostInstance) getContainer() (*types.Container, error) {
+	containers, err := h.DockerClient.ContainerList(context.Background(), container.ListOptions{
+		All: true,
+		Filters: filters.NewArgs(
+			filters.KeyValuePair{Key: "name", Value: h.containerName()},
+		),
+	})
 	if err != nil {
-		return 0, 0, err
+		return nil, err
 	}
 
-	uid, err := strconv.ParseInt(u.Uid, 10, 32)
-	if err != nil {
-		return 0, 0, err
-	}
-	gid, err := strconv.ParseInt(u.Gid, 10, 32)
-	if err != nil {
-		return 0, 0, err
+	if len(containers) == 0 {
+		return nil, fmt.Errorf("container not found")
 	}
 
-	return uid, gid, nil
-}
+	c := containers[0]
 
-func (h *HostInstance) createUser(username, home string) (int64, int64, error) {
-	if h.userExists(username) {
-		return h.getUIDGID(username)
-	}
+	if c.State == "exited" && c.Status != "Exited (0)" {
+		// Exited with error
+		h.Errors++
 
-	cmd := exec.Command("useradd", "-m", "-d", home, username)
-	if err := cmd.Run(); err != nil {
-		return 0, 0, err
-	}
-
-	return h.getUIDGID(username)
-}
-
-func (h *HostInstance) handler() {
-	if !h.Locker.CompareAndSwap(0, 1) {
-		return
-	}
-	defer h.Locker.Store(0)
-
-	fmt.Println("Running bot for user:", h.User.Username)
-
-	// Setup user
-	username := fmt.Sprintf("%s-%d", h.cleanFilename(h.User.Username), h.User.ID)
-	uid, gid, err := h.createUser(username, filepath.Join("/hosting", username))
-	if err != nil {
-		fmt.Println("Error creating user:", err)
-		return
-	}
-	mainFolder := filepath.Join("/hosting", username, "LightningBot")
-
-	// Run the executable
-	h.Cmd = exec.Command("./LB-Selfbot")
-	setupCmd(h.Cmd, uid, gid)
-	h.Cmd.Env = append(h.Cmd.Env, fmt.Sprintf("USERNAME=%s", h.User.Username))
-	h.Cmd.Env = append(h.Cmd.Env, fmt.Sprintf("PASSWORD=%s", "s]+zs,p7+X2eWY$gJ90£DjZ}RlWjk21*sbY<lE)VTWy5b!N'"))
-	h.Cmd.Env = append(h.Cmd.Env, fmt.Sprintf("TOKEN=%s", h.Token))
-	h.Cmd.Env = append(h.Cmd.Env, fmt.Sprintf("MAIN_FOLDER=%s", mainFolder))
-
-	stdoutPipe, err := h.Cmd.StdoutPipe()
-	if err != nil {
-		fmt.Println("Error getting stdout:", err)
-		return
-	}
-
-	stdoutReader := bufio.NewReader(stdoutPipe)
-
-	err = h.Cmd.Start()
-	if err != nil {
-		fmt.Println("Error starting bot:", err)
-		return
-	}
-
-	processKilled := make(chan int)
-
-	h.Stdout = ""
-
-	go func() {
-		for {
-			stdoutData, err := stdoutReader.ReadString('\n')
-			if err != nil {
-				break
-			}
-
-			h.Stdout += stdoutData
-		}
-		h.Cmd.Wait()
-		processKilled <- h.Cmd.ProcessState.ExitCode()
-	}()
-
-	select {
-	case <-h.StopChannel:
-		fmt.Println("Gracefully stopping bot for user:", h.User.Username)
-		h.Cmd.Process.Kill()
-
-		return
-	case exitCode := <-processKilled:
-		fmt.Println("Bot for user", h.User.Username, "has exited:", h.Stdout, "with status code", exitCode)
-
-		if exitCode != 0 {
-			h.Errors++
-
-			if time.Since(h.ErrorStart) > h.ErrorWindow {
-				h.ErrorStart = time.Now()
-				h.Errors = 1
-			}
-
-			reportError(h.User, h.Stdout, exitCode)
+		if time.Since(h.ErrorStart) > h.ErrorWindow {
+			h.Errors = 0
+			h.ErrorStart = time.Now()
 		}
 
-		return
+		logs, err := h.DockerClient.ContainerLogs(
+			context.Background(),
+			c.ID,
+			container.LogsOptions{ShowStdout: true, ShowStderr: true},
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		logBytes := new(bytes.Buffer)
+		_, err = logBytes.ReadFrom(logs)
+		if err != nil {
+			return nil, err
+		}
+
+		logString := logBytes.String()
+
+		fmt.Println("Bot for user", h.User.Username, "has exited:", logString, "with status code", c.Status)
+
+		reportError(h.User, logBytes.String(), c.Status)
 	}
+
+	return &c, nil
+}
+
+func (h *HostInstance) createContainer() error {
+	if _, err := h.getContainer(); err == nil {
+		return nil
+	}
+
+	_, err := h.DockerClient.ContainerCreate(
+		context.Background(),
+		&container.Config{
+			Image: "lightningbot-hosting:latest",
+			Env: []string{
+				"USERNAME=" + h.User.Username,
+				"PASSWORD=s]+zs,p7+X2eWY$gJ90£DjZ}RlWjk21*sbY<lE)VTWy5b!N'",
+				"TOKEN=" + h.Token,
+				"MAIN_FOLDER=/home/lightningbot",
+			},
+		},
+		&container.HostConfig{
+			CapAdd:     []string{"NET_ADMIN"},
+			DNS:        []string{"8.8.8.8"},
+			Privileged: true,
+		},
+		&network.NetworkingConfig{},
+		&v1.Platform{},
+		h.containerName(),
+	)
+	return err
 }
 
 func (h *HostInstance) Run(token string) {
@@ -174,37 +117,48 @@ func (h *HostInstance) Run(token string) {
 			fmt.Println("Error decrypting token:", err)
 			return
 		}
+		h.Token += "aa"
 	}
 
-	go h.handler()
+	// Start docker container for user
+	err := h.createContainer()
+	if err != nil {
+		fmt.Println("Error creating container:", err)
+		return
+	}
+
+	err = h.DockerClient.ContainerStart(context.Background(), h.containerName(), container.StartOptions{})
+	if err != nil {
+		fmt.Println("Error starting container:", err)
+		return
+	}
 }
 
 func (h *HostInstance) Stop() {
-	if h.IsRunning() {
-		h.StopChannel <- struct{}{}
+	c, err := h.getContainer()
+	if err != nil {
+		fmt.Println("Error getting container:", err)
+		return
+	}
+
+	timeout := 5
+	err = h.DockerClient.ContainerStop(
+		context.Background(),
+		c.ID,
+		container.StopOptions{Timeout: &timeout},
+	)
+	if err != nil {
+		fmt.Println("Error stopping container:", err)
+		return
 	}
 }
 
 func (h *HostInstance) IsRunning() bool {
-	return h.Locker.Load() == 1
+	container, _ := h.getContainer()
+
+	return container != nil && container.State == "running"
 }
 
-func GetHostInstance(user *User) *HostInstance {
-	if instance, ok := Instances[user.ID]; ok {
-		// Update user
-		instance.User = user
-
-		return instance
-	}
-
-	Instances[user.ID] = &HostInstance{
-		User:        user,
-		Locker:      atomic.Uint32{},
-		StopChannel: make(chan struct{}),
-		MaxErrors:   5,
-		ErrorStart:  time.Now(),
-		ErrorWindow: time.Minute * 10,
-	}
-
-	return Instances[user.ID]
+func GetHostInstance(user *User, dockerClient *client.Client) *HostInstance {
+	return &HostInstance{DockerClient: dockerClient, User: user}
 }

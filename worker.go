@@ -1,11 +1,22 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"time"
+
+	"github.com/docker/docker/client"
 )
 
 func worker(db *Database) {
+	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		fmt.Println("Error creating docker client:", err)
+		return
+	}
+
+	dockerClient.NegotiateAPIVersion(context.Background())
+
 	for {
 		fmt.Println("Getting users")
 
@@ -15,7 +26,7 @@ func worker(db *Database) {
 		}
 
 		for _, user := range users {
-			instance := GetHostInstance(user)
+			instance := GetHostInstance(user, dockerClient)
 
 			if instance.IsRunning() {
 				handleRunningInstance(instance, user, db)
@@ -65,9 +76,9 @@ func handleRunningInstance(instance *HostInstance, user *User, db *Database) {
 			if user.HostingCredit <= 0 {
 				// User doesn't have enough credit ==> Stop the instance
 				instance.Stop()
-	
+
 				user.IsHosting = false
-	
+
 				fmt.Println("Stopping instance for user:", user.Username)
 			}
 

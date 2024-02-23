@@ -166,7 +166,6 @@ func (h *HostInstance) Run(token string) {
 			fmt.Println("Error decrypting token:", err)
 			return
 		}
-		fmt.Println(h.Token)
 	}
 
 	// Start docker container for user

@@ -198,7 +198,7 @@ func (h *HostInstance) Stop() {
 		return
 	}
 
-	timeout := 5
+	timeout := 0
 	err = h.DockerClient.ContainerStop(
 		context.Background(),
 		c.ID,

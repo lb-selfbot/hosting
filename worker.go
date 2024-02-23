@@ -17,8 +17,6 @@ func worker(db *Database) {
 
 	dockerClient.NegotiateAPIVersion(context.Background())
 
-	setupDocker(dockerClient)
-
 	for {
 		fmt.Println("Getting users")
 

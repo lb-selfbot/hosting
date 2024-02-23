@@ -25,15 +25,6 @@ func worker(db *Database) {
 			fmt.Println("Error getting hosted users:", err)
 		}
 
-		users = []*User{
-			{
-				ID:              1,
-				Username:        "Lightning",
-				IsHosting:       true,
-				HostingLifetime: true,
-			},
-		}
-
 		for _, user := range users {
 			instance := GetHostInstance(user, dockerClient)
 

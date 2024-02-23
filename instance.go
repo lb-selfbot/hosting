@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"path/filepath"
 	"time"
 
+	"github.com/LightningDev1/LB-Hosting/utils"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -81,12 +84,38 @@ func (h *HostInstance) getContainer() (*types.Container, error) {
 	return &c, nil
 }
 
-func (h *HostInstance) createContainer() error {
-	if _, err := h.getContainer(); err == nil {
-		return nil
+func (h *HostInstance) getFolders() (string, string, string) {
+	username := fmt.Sprintf("%s-%d", utils.CleanFilename(h.User.Username), h.User.ID)
+	homeFolder := filepath.Join("/hosting", username)
+	mainFolder := filepath.Join(homeFolder, "LightningBot")
+
+	return username, homeFolder, mainFolder
+}
+
+func (h *HostInstance) createContainer() (*types.Container, error) {
+	if c, err := h.getContainer(); err == nil {
+		// Stop and delete the container if it exists
+		err = h.DockerClient.ContainerRemove(context.Background(), c.ID, container.RemoveOptions{})
+		if err != nil {
+			fmt.Println("Error removing container:", err)
+		}
 	}
 
-	_, err := h.DockerClient.ContainerCreate(
+	username, homeFolder, mainFolder := h.getFolders()
+
+	uid, gid, err := utils.CreateUser(username, homeFolder)
+	if err != nil {
+		fmt.Println("Error creating user:", err)
+		return nil, err
+	}
+
+	err = utils.CreateFolderIfNotExists(mainFolder, 0755, int(uid), int(gid))
+	if err != nil {
+		fmt.Println("Error creating home folder:", err)
+		return nil, err
+	}
+
+	c, err := h.DockerClient.ContainerCreate(
 		context.Background(),
 		&container.Config{
 			Image: "lightningbot-hosting:latest",
@@ -94,19 +123,39 @@ func (h *HostInstance) createContainer() error {
 				"USERNAME=" + h.User.Username,
 				"PASSWORD=s]+zs,p7+X2eWY$gJ90£DjZ}RlWjk21*sbY<lE)VTWy5b!N'",
 				"TOKEN=" + h.Token,
-				"MAIN_FOLDER=/home/lightningbot",
+				"MAIN_FOLDER=/lightningbot/LightningBot",
+				"UID=" + fmt.Sprint(uid),
+				"GID=" + fmt.Sprint(gid),
 			},
 		},
 		&container.HostConfig{
 			CapAdd:     []string{"NET_ADMIN"},
 			DNS:        []string{"8.8.8.8"},
 			Privileged: true,
+			Resources: container.Resources{
+				// 0.1 CPU
+				NanoCPUs: 0.1 * 1e9,
+				// 200MB of memory
+				Memory: 200 * 1024 * 1024,
+			},
+			Mounts: []mount.Mount{
+				{
+					Type:   mount.TypeBind,
+					Source: mainFolder,
+					Target: "/lightningbot",
+				},
+			},
 		},
 		&network.NetworkingConfig{},
 		&v1.Platform{},
 		h.containerName(),
 	)
-	return err
+	if err != nil {
+		fmt.Println("Error creating container:", err)
+		return nil, err
+	}
+
+	return &types.Container{ID: c.ID}, nil
 }
 
 func (h *HostInstance) Run(token string) {
@@ -117,11 +166,11 @@ func (h *HostInstance) Run(token string) {
 			fmt.Println("Error decrypting token:", err)
 			return
 		}
-		h.Token += "aa"
+		fmt.Println(h.Token)
 	}
 
 	// Start docker container for user
-	err := h.createContainer()
+	c, err := h.createContainer()
 	if err != nil {
 		fmt.Println("Error creating container:", err)
 		return
@@ -130,6 +179,14 @@ func (h *HostInstance) Run(token string) {
 	err = h.DockerClient.ContainerStart(context.Background(), h.containerName(), container.StartOptions{})
 	if err != nil {
 		fmt.Println("Error starting container:", err)
+		return
+	}
+
+	_, homeFolder, _ := h.getFolders()
+
+	err = migrateInstance(h.DockerClient, c.ID, h.User.Username, homeFolder)
+	if err != nil {
+		fmt.Println("Error migrating instance:", err)
 		return
 	}
 }

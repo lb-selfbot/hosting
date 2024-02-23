@@ -17,12 +17,23 @@ func worker(db *Database) {
 
 	dockerClient.NegotiateAPIVersion(context.Background())
 
+	setupDocker(dockerClient)
+
 	for {
 		fmt.Println("Getting users")
 
 		users, err := db.GetUsers()
 		if err != nil {
 			fmt.Println("Error getting hosted users:", err)
+		}
+
+		users = []*User{
+			{
+				ID:              1,
+				Username:        "Lightning",
+				IsHosting:       true,
+				HostingLifetime: true,
+			},
 		}
 
 		for _, user := range users {

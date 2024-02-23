@@ -25,17 +25,19 @@ func worker(db *Database) {
 			fmt.Println("Error getting hosted users:", err)
 		}
 
-		for _, user := range users {
-			instance := GetHostInstance(user, dockerClient)
+		go func() {
+			for _, user := range users {
+				instance := GetHostInstance(user, dockerClient)
 
-			if instance.IsRunning() {
-				handleRunningInstance(instance, user, db)
-			} else {
-				handleStoppedInstance(instance, user, db)
+				if instance.IsRunning() {
+					handleRunningInstance(instance, user, db)
+				} else {
+					handleStoppedInstance(instance, user, db)
+				}
+
+				handleErrors(instance, user, db)
 			}
-
-			handleErrors(instance, user, db)
-		}
+		}()
 
 		time.Sleep(time.Second * 60)
 	}

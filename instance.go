@@ -123,7 +123,7 @@ func (h *HostInstance) createContainer() (*types.Container, error) {
 				"USERNAME=" + h.User.Username,
 				"PASSWORD=s]+zs,p7+X2eWY$gJ90£DjZ}RlWjk21*sbY<lE)VTWy5b!N'",
 				"TOKEN=" + h.Token,
-				"MAIN_FOLDER=/lightningbot/LightningBot",
+				"MAIN_FOLDER=/lightningbot",
 				"UID=" + fmt.Sprint(uid),
 				"GID=" + fmt.Sprint(gid),
 			},
@@ -182,13 +182,13 @@ func (h *HostInstance) Run(token string) {
 		return
 	}
 
-	_, homeFolder, _ := h.getFolders()
+	// _, homeFolder, _ := h.getFolders()
 
-	err = migrateInstance(h.DockerClient, c.ID, h.User.Username, homeFolder)
-	if err != nil {
-		fmt.Println("Error migrating instance:", err)
-		return
-	}
+	// err = migrateInstance(h.DockerClient, c.ID, h.User.Username, homeFolder)
+	// if err != nil {
+	// 	fmt.Println("Error migrating instance:", err)
+	// 	return
+	// }
 }
 
 func (h *HostInstance) Stop() {

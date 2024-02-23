@@ -170,7 +170,7 @@ func (h *HostInstance) Run(token string) {
 	}
 
 	// Start docker container for user
-	c, err := h.createContainer()
+	_, err := h.createContainer()
 	if err != nil {
 		fmt.Println("Error creating container:", err)
 		return

@@ -218,5 +218,20 @@ func (h *HostInstance) IsRunning() bool {
 }
 
 func GetHostInstance(user *User, dockerClient *client.Client) *HostInstance {
-	return &HostInstance{DockerClient: dockerClient, User: user}
+	if instance, ok := Instances[user.ID]; ok {
+		// Update user
+		instance.User = user
+
+		return instance
+	}
+
+	Instances[user.ID] = &HostInstance{
+		DockerClient: dockerClient,
+		User:         user,
+		MaxErrors:    5,
+		ErrorStart:   time.Now(),
+		ErrorWindow:  time.Minute * 10,
+	}
+
+	return Instances[user.ID]
 }

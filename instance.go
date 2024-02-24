@@ -211,10 +211,14 @@ func (h *HostInstance) Stop() {
 	}
 }
 
-func (h *HostInstance) IsRunning() bool {
-	container, _ := h.getContainer()
+func (h *HostInstance) IsRunning(containers []types.Container) bool {
+	for _, c := range containers {
+		if c.Names[0] == "/"+h.containerName() {
+			return c.State == "running"
+		}
+	}
 
-	return container != nil && container.State == "running"
+	return false
 }
 
 func GetHostInstance(user *User, dockerClient *client.Client) *HostInstance {

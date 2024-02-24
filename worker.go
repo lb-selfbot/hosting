@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 )
 
@@ -25,19 +26,24 @@ func worker(db *Database) {
 			fmt.Println("Error getting hosted users:", err)
 		}
 
-		go func() {
-			for _, user := range users {
-				instance := GetHostInstance(user, dockerClient)
+		containers, err := dockerClient.ContainerList(context.Background(), container.ListOptions{All: true})
+		if err != nil {
+			fmt.Println("Error getting containers:", err)
+		}
 
-				if instance.IsRunning() {
-					handleRunningInstance(instance, user, db)
-				} else {
-					handleStoppedInstance(instance, user, db)
-				}
 
-				handleErrors(instance, user, db)
+
+		for _, user := range users {
+			instance := GetHostInstance(user, dockerClient)
+
+			if instance.IsRunning(containers) {
+				handleRunningInstance(instance, user, db)
+			} else {
+				handleStoppedInstance(instance, user, db)
 			}
-		}()
+
+			handleErrors(instance, user, db)
+		}
 
 		time.Sleep(time.Second * 60)
 	}

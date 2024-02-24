@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/LightningDev1/LB-Hosting/utils"
@@ -50,7 +51,8 @@ func (h *HostInstance) getContainer() (*types.Container, error) {
 
 	c := containers[0]
 
-	if c.State == "exited" && c.Status != "Exited (0)" {
+	// Exited with non-zero exit code
+	if c.State == "exited" && !strings.Contains(c.Status, "Exited (0)") {
 		// Exited with error
 		h.Errors++
 

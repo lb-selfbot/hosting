@@ -147,6 +147,7 @@ func (h *HostInstance) createContainer() (*types.Container, error) {
 					Target: "/lightningbot",
 				},
 			},
+			NetworkMode: "container:vpn",
 		},
 		&network.NetworkingConfig{},
 		&v1.Platform{},

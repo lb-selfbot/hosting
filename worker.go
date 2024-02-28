@@ -31,8 +31,6 @@ func worker(db *Database) {
 			fmt.Println("Error getting containers:", err)
 		}
 
-
-
 		for _, user := range users {
 			instance := GetHostInstance(user, dockerClient)
 

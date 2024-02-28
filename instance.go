@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -44,6 +45,10 @@ func (h *HostInstance) getContainer() (*types.Container, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	containers = slices.DeleteFunc(containers, func(c types.Container) bool {
+		return c.Names[0] != "/"+h.containerName()
+	})
 
 	if len(containers) == 0 {
 		return nil, fmt.Errorf("container not found")
@@ -183,14 +188,6 @@ func (h *HostInstance) Run(token string) {
 		fmt.Println("Error starting container:", err)
 		return
 	}
-
-	// _, homeFolder, _ := h.getFolders()
-
-	// err = migrateInstance(h.DockerClient, c.ID, h.User.Username, homeFolder)
-	// if err != nil {
-	// 	fmt.Println("Error migrating instance:", err)
-	// 	return
-	// }
 }
 
 func (h *HostInstance) Stop() {

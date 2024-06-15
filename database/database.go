@@ -17,6 +17,7 @@ type User struct {
 
 type Database struct {
 	Host     string
+	Username string
 	Password string
 
 	Conn *sql.DB
@@ -27,13 +28,14 @@ var Users = make(map[int]*User)
 
 func NewDatabase() *Database {
 	return &Database{
-		Host:     os.Getenv("HOST"),
-		Password: os.Getenv("PASSWORD"),
+		Host:     os.Getenv("DB_HOST"),
+		Username: os.Getenv("DB_USERNAME"),
+		Password: os.Getenv("DB_PASSWORD"),
 	}
 }
 
 func (db *Database) Connect() (err error) {
-	dsn := fmt.Sprintf("api:%s@tcp(%s:3306)/lightningbot", db.Password, db.Host)
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:3306)/lightningbot", db.Username, db.Password, db.Host)
 
 	db.Conn, err = sql.Open("mysql", dsn)
 	if err != nil {

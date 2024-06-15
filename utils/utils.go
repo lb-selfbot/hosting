@@ -1,18 +1,25 @@
 package utils
 
 import (
+	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 )
 
-func CleanFilename(filename string) string {
+func CleanFilename(filename string, isFolder ...bool) string {
+	regexExp := `[^a-zA-Z0-9\._-]`
+	if len(isFolder) > 0 && isFolder[0] {
+		regexExp = `[^a-zA-Z0-9\._/-]`
+	}
 	// Replace invalid characters with underscores
-	re := regexp.MustCompile(`[^a-zA-Z0-9\._-]`)
+	re := regexp.MustCompile(regexExp)
 	cleaned := re.ReplaceAllString(filename, "_")
 
 	// Remove leading and trailing underscores
@@ -27,6 +34,14 @@ func CleanFilename(filename string) string {
 	}
 
 	return cleaned
+}
+
+func GetUserFolders(username string, id int) (string, string, string) {
+	username = fmt.Sprintf("%s-%d", CleanFilename(username), id)
+	homeFolder := filepath.Join("/hosting", username)
+	mainFolder := filepath.Join(homeFolder, "LightningBot")
+
+	return username, homeFolder, mainFolder
 }
 
 func UserExists(username string) bool {
@@ -78,4 +93,18 @@ func CreateFolderIfNotExists(folder string, perm fs.FileMode, uid, gid int) erro
 	}
 
 	return nil
+}
+
+func IsDirEmpty(name string) (bool, error) {
+	f, err := os.Open(name)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+
+	_, err = f.Readdirnames(1)
+	if err == io.EOF {
+		return true, nil
+	}
+	return false, err
 }

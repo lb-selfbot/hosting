@@ -1,4 +1,4 @@
-package main
+package encryption
 
 import (
 	"crypto/rand"
@@ -47,7 +47,7 @@ func DecryptWithPrivateKey(ciphertext []byte, priv *rsa.PrivateKey) ([]byte, err
 	return rsa.DecryptPKCS1v15(rand.Reader, priv, ciphertext)
 }
 
-func decrypt(ct string) (string, error) {
+func Decrypt(ct string) (string, error) {
 	// Decode the base64 ciphertext
 	ciphertext, err := base64.StdEncoding.DecodeString(ct)
 	if err != nil {

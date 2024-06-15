@@ -1,4 +1,4 @@
-package main
+package database
 
 import (
 	"database/sql"
@@ -21,6 +21,9 @@ type Database struct {
 
 	Conn *sql.DB
 }
+
+// ID --> User
+var Users = make(map[int]*User)
 
 func NewDatabase() *Database {
 	return &Database{
@@ -54,7 +57,7 @@ func (db *Database) GetUsers() (users []*User, err error) {
 		var u User
 
 		if err := rows.Scan(&u.ID, &u.Username, &u.IsHosting, &u.HostingCredit, &u.HostingLifetime); err != nil {
-			panic(err)
+			return nil, err
 		}
 
 		users = append(users, &u)
@@ -62,6 +65,23 @@ func (db *Database) GetUsers() (users []*User, err error) {
 	}
 
 	return
+}
+
+func (db *Database) GetUserByID(id int) (*User, error) {
+	rows, err := db.Conn.Query("SELECT id, username, is_hosting, hosting_credit, hosting_lifetime FROM api_user WHERE id = ?", id)
+	if err != nil {
+		return nil, err
+	}
+
+	var user User
+
+	for rows.Next() {
+		if err := rows.Scan(&user.ID, &user.Username, &user.IsHosting, &user.HostingCredit, &user.HostingLifetime); err != nil {
+			return nil, err
+		}
+	}
+
+	return &user, nil
 }
 
 func (db *Database) GetUserToken(user *User) (string, error) {

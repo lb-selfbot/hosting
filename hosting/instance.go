@@ -1,14 +1,16 @@
-package main
+package hosting
 
 import (
 	"bytes"
 	"context"
 	"fmt"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/LightningDev1/LB-Hosting/database"
+	"github.com/LightningDev1/LB-Hosting/encryption"
+	"github.com/LightningDev1/LB-Hosting/log"
 	"github.com/LightningDev1/LB-Hosting/utils"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -21,7 +23,7 @@ import (
 
 type HostInstance struct {
 	DockerClient *client.Client
-	User         *User
+	User         *database.User
 	Token        string
 
 	// Sliding window for errors
@@ -30,6 +32,9 @@ type HostInstance struct {
 	ErrorStart  time.Time
 	ErrorWindow time.Duration
 }
+
+// ID --> HostInstance
+var Instances = make(map[int]*HostInstance)
 
 func (h *HostInstance) containerName() string {
 	return fmt.Sprintf("lightningbot-hosting-%d", h.User.ID)
@@ -85,18 +90,10 @@ func (h *HostInstance) getContainer() (*types.Container, error) {
 
 		fmt.Println("Bot for user", h.User.Username, "has exited:", logString, "with status code", c.Status)
 
-		reportError(h.User, logBytes.String(), c.Status)
+		log.LogError(h.User, logBytes.String(), c.Status)
 	}
 
 	return &c, nil
-}
-
-func (h *HostInstance) getFolders() (string, string, string) {
-	username := fmt.Sprintf("%s-%d", utils.CleanFilename(h.User.Username), h.User.ID)
-	homeFolder := filepath.Join("/hosting", username)
-	mainFolder := filepath.Join(homeFolder, "LightningBot")
-
-	return username, homeFolder, mainFolder
 }
 
 func (h *HostInstance) createContainer() (*types.Container, error) {
@@ -108,7 +105,7 @@ func (h *HostInstance) createContainer() (*types.Container, error) {
 		}
 	}
 
-	username, homeFolder, mainFolder := h.getFolders()
+	username, homeFolder, mainFolder := utils.GetUserFolders(h.User.Username, h.User.ID)
 
 	uid, gid, err := utils.CreateUser(username, homeFolder)
 	if err != nil {
@@ -169,7 +166,7 @@ func (h *HostInstance) createContainer() (*types.Container, error) {
 func (h *HostInstance) Run(token string) {
 	if token != "" {
 		var err error
-		h.Token, err = decrypt(token)
+		h.Token, err = encryption.Decrypt(token)
 		if err != nil {
 			fmt.Println("Error decrypting token:", err)
 			return
@@ -219,7 +216,7 @@ func (h *HostInstance) IsRunning(containers []types.Container) bool {
 	return false
 }
 
-func GetHostInstance(user *User, dockerClient *client.Client) *HostInstance {
+func GetHostInstance(user *database.User, dockerClient *client.Client) *HostInstance {
 	if instance, ok := Instances[user.ID]; ok {
 		// Update user
 		instance.User = user

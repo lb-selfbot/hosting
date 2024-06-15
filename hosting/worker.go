@@ -1,15 +1,29 @@
-package main
+package hosting
 
 import (
 	"context"
 	"fmt"
 	"time"
 
+	"sync/atomic"
+
+	"github.com/LightningDev1/LB-Hosting/database"
+	"github.com/LightningDev1/LB-Hosting/log"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 )
 
-func worker(db *Database) {
+const (
+	WorkerStatusStopped = 0
+	WorkerStatusRunning = 1
+)
+
+var WorkerStatus = atomic.Int32{}
+
+func Worker(db *database.Database) {
+	WorkerStatus.Store(WorkerStatusRunning)
+	defer WorkerStatus.Store(WorkerStatusStopped)
+
 	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		fmt.Println("Error creating docker client:", err)
@@ -47,7 +61,7 @@ func worker(db *Database) {
 	}
 }
 
-func handleErrors(instance *HostInstance, user *User, db *Database) {
+func handleErrors(instance *HostInstance, user *database.User, db *database.Database) {
 	if instance.Errors > instance.MaxErrors && user.IsHosting {
 		// Too many errors ==> Stop the instance
 		instance.Stop()
@@ -64,13 +78,13 @@ func handleErrors(instance *HostInstance, user *User, db *Database) {
 			fmt.Println("Error updating user:", err)
 		}
 
-		reportTooManyErrors(user)
+		log.LogTooManyErrors(user)
 
 		fmt.Println("Stopping instance for user (too many errors):", user.Username)
 	}
 }
 
-func handleRunningInstance(instance *HostInstance, user *User, db *Database) {
+func handleRunningInstance(instance *HostInstance, user *database.User, db *database.Database) {
 	if user.IsHosting {
 		fmt.Println("User", user.Username, "is hosting, credit:", user.HostingCredit, "lifetime:", user.HostingLifetime)
 
@@ -103,7 +117,7 @@ func handleRunningInstance(instance *HostInstance, user *User, db *Database) {
 	}
 }
 
-func handleStoppedInstance(instance *HostInstance, user *User, db *Database) {
+func handleStoppedInstance(instance *HostInstance, user *database.User, db *database.Database) {
 	// If the instance is not running and the user is hosting, start the instance
 	if user.IsHosting && (user.HostingCredit > 0 || user.HostingLifetime) {
 		token, err := db.GetUserToken(user)

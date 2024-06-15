@@ -54,26 +54,33 @@ func getListFiles(c *fiber.Ctx) error {
 	}
 
 	content := make(map[string]map[string][]string)
-	err = filepath.Walk(mainFolder, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		relPath := strings.Replace(strings.TrimPrefix(path, mainFolder), "\\", "/", -1)
-		if relPath == "" {
-			relPath = "/"
-		}
+    err = filepath.Walk(mainFolder, func(path string, info os.FileInfo, err error) error {
+        if err != nil {
+            return err
+        }
 
-		if _, exists := content[relPath]; !exists {
-			content[relPath] = make(map[string][]string)
-		}
+        relPath := strings.Replace(strings.TrimPrefix(path, mainFolder), "\\", "/", -1)
+        if relPath == "" {
+            relPath = "/"
+        }
 
-		if info.IsDir() {
-			content[relPath]["folders"] = append(content[relPath]["folders"], info.Name())
-		} else {
-			content[relPath]["files"] = append(content[relPath]["files"], info.Name())
-		}
-		return nil
-	})
+        // Initialize the map entry for the directory if it doesn't exist.
+        if _, exists := content[relPath]; !exists {
+            content[relPath] = map[string][]string{
+                "folders": {},
+                "files":   {},
+            }
+        }
+
+        // Check if item is a folder.
+        if info.IsDir() {
+            content[filepath.Dir(relPath)]["folders"] = append(content[filepath.Dir(relPath)]["folders"], info.Name())
+        } else {
+            content[filepath.Dir(relPath)]["files"] = append(content[filepath.Dir(relPath)]["files"], info.Name())
+        }
+
+        return nil
+    })
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error":  true,

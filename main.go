@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/LightningDev1/LB-Hosting/api"
 	"github.com/LightningDev1/LB-Hosting/database"
@@ -44,12 +45,22 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		hosting.Worker(db)
+		for {
+			hosting.Worker(db)
+
+			fmt.Println("[WARNING] Worker stopped, restarting in 5 seconds...")
+			time.Sleep(5 * time.Second)
+		}
 	}()
 
 	go func() {
 		defer wg.Done()
-		api.StartAPI(db)
+		for {
+			api.StartAPI(db)
+
+			fmt.Println("[WARNING] API stopped, restarting in 5 seconds...")
+			time.Sleep(5 * time.Second)
+		}
 	}()
 
 	wg.Wait()

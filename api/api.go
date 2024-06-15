@@ -9,7 +9,9 @@ import (
 )
 
 func StartAPI(db *database.Database) {
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		AppName: "LB-Hosting API",
+	})
 
 	apiKey := []byte(os.Getenv("API_KEY"))
 	if apiKey == nil {
@@ -36,7 +38,7 @@ func StartAPI(db *database.Database) {
 	app.Get("/api/v1/download-file", middleware, getDownloadFile)
 
 	host := ":8085"
-	if os.Args[1] != "" {
+	if len(os.Args) > 1 && os.Args[1] != "" {
 		host = os.Args[1]
 	}
 

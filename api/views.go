@@ -254,7 +254,7 @@ func getDownloadFile(c *fiber.Ctx) error {
 		})
 	}
 
-	cleanedFilePath := utils.CleanFilename(filePathParam, false)
+	cleanedFilePath := utils.CleanFilename(filePathParam, true)
 	cleanedFilePath = strings.TrimPrefix(cleanedFilePath, "/")
 	requestedPath := filepath.Join(mainFolder, cleanedFilePath)
 
@@ -276,5 +276,5 @@ func getDownloadFile(c *fiber.Ctx) error {
 	// Set headers for file download
 	c.Set("Content-Disposition", "attachment; filename="+filepath.Base(requestedPath))
 	c.Set("Content-Type", "application/octet-stream")
-	return c.SendFile(requestedPath)
+	return c.SendFile(requestedPath, true)
 }

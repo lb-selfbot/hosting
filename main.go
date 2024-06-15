@@ -40,14 +40,14 @@ func main() {
 
 	var wg sync.WaitGroup
 
+	wg.Add(2)
+
 	go func() {
-		wg.Add(1)
 		defer wg.Done()
 		hosting.Worker(db)
 	}()
 
 	go func() {
-		wg.Add(1)
 		defer wg.Done()
 		api.StartAPI(db)
 	}()

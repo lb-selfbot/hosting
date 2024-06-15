@@ -41,5 +41,4 @@ func StartAPI(db *database.Database) {
 	}
 
 	app.Listen(host)
-
 }

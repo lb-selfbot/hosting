@@ -166,8 +166,7 @@ func (h *HostInstance) createContainer() (*types.Container, error) {
 			Driver: "macvlan",
 			IPAM: &network.IPAM{
 				Config: []network.IPAMConfig{
-					{Subnet: "0.0.0.0/0"},
-					// {Subnet: "134.255.220.0/24", Gateway: gateway, IPRange: iprange},
+					{Subnet: "134.255.220.0/24", Gateway: "134.255.220.1"},
 				},
 			},
 			Options: map[string]string{

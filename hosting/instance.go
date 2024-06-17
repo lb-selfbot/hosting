@@ -124,9 +124,12 @@ func (h *HostInstance) createContainer() (*types.Container, error) {
 		return nil, err
 	}
 
-	// Choose random interface
-	interfaces := []string{"eth0", "eth0:1"}
-	parentInterface := interfaces[rand.Intn(len(interfaces))]
+	// Choose random IP
+	ips := []string{"134.255.220.154", "5.249.162.249"}
+	ip := ips[rand.Intn(len(ips))]
+
+	// interfaces := []string{"eth0", "eth0:1"}
+	// parentInterface := interfaces[rand.Intn(len(interfaces))]
 
 	// Check if macvlan network exists, if not, create it.
 	networkList, err := h.DockerClient.NetworkList(context.Background(), types.NetworkListOptions{})
@@ -135,35 +138,37 @@ func (h *HostInstance) createContainer() (*types.Container, error) {
 		return nil, err
 	}
 
-	macvlanName := h.ifaceToMacvlan(parentInterface)
-
-	fmt.Println("Using", parentInterface, macvlanName, "for user", h.User.Username)
+	fmt.Println("Using", ip, "for user", h.User.Username)
 
 	macvlanNetworkExists := false
 	for _, network := range networkList {
-		if network.Name == macvlanName && network.Driver == "macvlan" {
+		if network.Name == "hosting-macvlan" && network.Driver == "macvlan" {
 			macvlanNetworkExists = true
 			break
 		}
 	}
 
 	if !macvlanNetworkExists {
-		var subnet, gateway string
-		if parentInterface == "eth0" {
-			subnet = "134.255.220.0/24" // From eth0 configuration
-			gateway = "134.255.220.1"   // From eth0 configuration
-		} else if parentInterface == "eth0:1" {
-			subnet = "5.249.162.0/24" // From eth0:1 configuration
-			gateway = "5.249.162.1"   // From eth0:1 configuration
-		}
+		// var subnet, gateway, iprange string
+		// if parentInterface == "eth0" {
+		// 	subnet = "134.255.220.0/24" // From eth0 configuration
+		// 	gateway = "134.255.220.1"   // From eth0 configuration
 
-		_, err = h.DockerClient.NetworkCreate(context.Background(), macvlanName, types.NetworkCreate{
+		// 	iprange = ""
+		// } else if parentInterface == "eth0:1" {
+		// 	subnet = "5.249.162.0/24" // From eth0:1 configuration
+		// 	gateway = "5.249.162.1"   // From eth0:1 configuration
+
+		// 	iprange = ""
+		// }
+
+		_, err = h.DockerClient.NetworkCreate(context.Background(), "hosting-macvlan", types.NetworkCreate{
 			Driver: "macvlan",
-			IPAM: &network.IPAM{
-				Config: []network.IPAMConfig{
-					{Subnet: subnet, Gateway: gateway},
-				},
-			},
+			// IPAM: &network.IPAM{
+			// 	Config: []network.IPAMConfig{
+			// 		{Subnet: subnet, Gateway: gateway, IPRange: iprange},
+			// 	},
+			// },
 			Options: map[string]string{
 				"parent": "eth0",
 			},
@@ -206,9 +211,17 @@ func (h *HostInstance) createContainer() (*types.Container, error) {
 			},
 			// Start without network
 			// NetworkMode: "defaukt",
-			NetworkMode: container.NetworkMode(macvlanName),
+			NetworkMode: container.NetworkMode("hosting-macvlan"),
 		},
-		&network.NetworkingConfig{},
+		&network.NetworkingConfig{
+			EndpointsConfig: map[string]*network.EndpointSettings{
+				"macvlan": {
+					IPAMConfig: &network.EndpointIPAMConfig{
+						IPv4Address: ip,
+					},
+				},
+			},
+		},
 		&v1.Platform{},
 		h.containerName(),
 	)

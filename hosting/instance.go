@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math/rand"
 	"slices"
 	"strings"
 	"time"
@@ -119,6 +120,51 @@ func (h *HostInstance) createContainer() (*types.Container, error) {
 		return nil, err
 	}
 
+	// Choose random interface
+	interfaces := []string{"eth0", "eth0:1"}
+	parentInterface := interfaces[rand.Intn(len(interfaces))]
+
+	// Check if macvlan network exists, if not, create it.
+	networkList, err := h.DockerClient.NetworkList(context.Background(), types.NetworkListOptions{})
+	if err != nil {
+		fmt.Println("Error creating container: listing networks:", err)
+		return nil, err
+	}
+
+	macvlanNetworkExists := false
+	for _, network := range networkList {
+		if network.Name == "macvlan-"+parentInterface && network.Driver == "macvlan" {
+			macvlanNetworkExists = true
+			break
+		}
+	}
+
+	if !macvlanNetworkExists {
+		var subnet, gateway string
+		if parentInterface == "eth0" {
+			subnet = "134.255.220.0/24" // From eth0 configuration
+			gateway = "134.255.220.1"   // From eth0 configuration
+		} else if parentInterface == "eth0:1" {
+			subnet = "5.249.162.0/24" // From eth0:1 configuration
+			gateway = "5.249.162.1"   // From eth0:1 configuration
+		}
+
+		_, err = h.DockerClient.NetworkCreate(context.Background(), "macvlan-"+parentInterface, types.NetworkCreate{
+			Driver: "macvlan",
+			IPAM: &network.IPAM{
+				Config: []network.IPAMConfig{
+					{Subnet: subnet, Gateway: gateway},
+				},
+			},
+			Options: map[string]string{
+				"parent": parentInterface,
+			},
+		})
+		if err != nil {
+			// Handle error
+		}
+	}
+
 	c, err := h.DockerClient.ContainerCreate(
 		context.Background(),
 		&container.Config{
@@ -149,7 +195,9 @@ func (h *HostInstance) createContainer() (*types.Container, error) {
 					Target: "/lightningbot",
 				},
 			},
-			// NetworkMode: "container:vpn",
+			// Start without network
+			// NetworkMode: "defaukt",
+			NetworkMode: container.NetworkMode("macvlan-" + parentInterface),
 		},
 		&network.NetworkingConfig{},
 		&v1.Platform{},

@@ -163,7 +163,7 @@ func (h *HostInstance) createContainer() (*types.Container, error) {
 				},
 			},
 			Options: map[string]string{
-				"parent": "eth0",
+				"parent": parentInterface,
 			},
 		})
 		if err != nil {

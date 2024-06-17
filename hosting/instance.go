@@ -97,6 +97,10 @@ func (h *HostInstance) getContainer() (*types.Container, error) {
 	return &c, nil
 }
 
+func (h *HostInstance) ifaceToMacvlan(iface string) string {
+	return "macvlan-" + strings.ReplaceAll(iface, ":", "-")
+}
+
 func (h *HostInstance) createContainer() (*types.Container, error) {
 	if c, err := h.getContainer(); err == nil {
 		// Stop and delete the container if it exists
@@ -131,9 +135,11 @@ func (h *HostInstance) createContainer() (*types.Container, error) {
 		return nil, err
 	}
 
+	macvlanName := h.ifaceToMacvlan(parentInterface)
+
 	macvlanNetworkExists := false
 	for _, network := range networkList {
-		if network.Name == "macvlan-"+parentInterface && network.Driver == "macvlan" {
+		if network.Name == macvlanName && network.Driver == "macvlan" {
 			macvlanNetworkExists = true
 			break
 		}
@@ -149,7 +155,7 @@ func (h *HostInstance) createContainer() (*types.Container, error) {
 			gateway = "5.249.162.1"   // From eth0:1 configuration
 		}
 
-		_, err = h.DockerClient.NetworkCreate(context.Background(), "macvlan-"+parentInterface, types.NetworkCreate{
+		_, err = h.DockerClient.NetworkCreate(context.Background(), macvlanName, types.NetworkCreate{
 			Driver: "macvlan",
 			IPAM: &network.IPAM{
 				Config: []network.IPAMConfig{
@@ -198,7 +204,7 @@ func (h *HostInstance) createContainer() (*types.Container, error) {
 			},
 			// Start without network
 			// NetworkMode: "defaukt",
-			NetworkMode: container.NetworkMode("macvlan-" + parentInterface),
+			NetworkMode: container.NetworkMode(macvlanName),
 		},
 		&network.NetworkingConfig{},
 		&v1.Platform{},

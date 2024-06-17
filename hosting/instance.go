@@ -161,7 +161,8 @@ func (h *HostInstance) createContainer() (*types.Container, error) {
 			},
 		})
 		if err != nil {
-			// Handle error
+			fmt.Println("Error creating container: creating network", err)
+			return nil, err
 		}
 	}
 

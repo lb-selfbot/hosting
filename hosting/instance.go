@@ -137,6 +137,8 @@ func (h *HostInstance) createContainer() (*types.Container, error) {
 
 	macvlanName := h.ifaceToMacvlan(parentInterface)
 
+	fmt.Println("Using", parentInterface, macvlanName, "for user", h.User.Username)
+
 	macvlanNetworkExists := false
 	for _, network := range networkList {
 		if network.Name == macvlanName && network.Driver == "macvlan" {
@@ -163,7 +165,7 @@ func (h *HostInstance) createContainer() (*types.Container, error) {
 				},
 			},
 			Options: map[string]string{
-				"parent": parentInterface,
+				"parent": "eth0",
 			},
 		})
 		if err != nil {

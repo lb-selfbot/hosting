@@ -128,11 +128,6 @@ func (h *HostInstance) createContainer() (*types.Container, error) {
 	interfaces := []string{"eth0", "eth0:1"}
 	parentInterface := interfaces[rand.Intn(len(interfaces))]
 
-	if h.User.Username == "Lightning"{
-		parentInterface = "eth0:1"
-	
-	}
-
 	// Check if macvlan network exists, if not, create it.
 	networkList, err := h.DockerClient.NetworkList(context.Background(), types.NetworkListOptions{})
 	if err != nil {

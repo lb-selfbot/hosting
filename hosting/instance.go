@@ -164,11 +164,12 @@ func (h *HostInstance) createContainer() (*types.Container, error) {
 
 		_, err = h.DockerClient.NetworkCreate(context.Background(), "hosting-macvlan", types.NetworkCreate{
 			Driver: "macvlan",
-			// IPAM: &network.IPAM{
-			// 	Config: []network.IPAMConfig{
-			// 		{Subnet: subnet, Gateway: gateway, IPRange: iprange},
-			// 	},
-			// },
+			IPAM: &network.IPAM{
+				Config: []network.IPAMConfig{
+					{Subnet: "0.0.0.0/0"},
+					// {Subnet: "134.255.220.0/24", Gateway: gateway, IPRange: iprange},
+				},
+			},
 			Options: map[string]string{
 				"parent": "eth0",
 			},

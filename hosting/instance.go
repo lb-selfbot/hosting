@@ -215,7 +215,7 @@ func (h *HostInstance) createContainer() (*types.Container, error) {
 		},
 		&network.NetworkingConfig{
 			EndpointsConfig: map[string]*network.EndpointSettings{
-				"macvlan": {
+				"hosting-macvlan": {
 					IPAMConfig: &network.EndpointIPAMConfig{
 						IPv4Address: ip,
 					},

@@ -198,7 +198,7 @@ func (h *HostInstance) createContainer() (*types.Container, error) {
 				// 0.1 CPU
 				NanoCPUs: 0.1 * 1e9,
 				// 200MB of memory
-				Memory: 300 * 1024 * 1024,
+				Memory: 200 * 1024 * 1024,
 			},
 			Mounts: []mount.Mount{
 				{

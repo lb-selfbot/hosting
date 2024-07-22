@@ -14,9 +14,9 @@ import (
 )
 
 func CleanFilename(filename string, isFolder ...bool) string {
-	regexExp := `[^a-zA-Z0-9\._-]`
+	regexExp := `[^a-zA-Z0-9#\._-]`
 	if len(isFolder) > 0 && isFolder[0] {
-		regexExp = `[^a-zA-Z0-9\._/-]`
+		regexExp = `[^a-zA-Z0-9#\._/-]`
 	}
 	// Replace invalid characters with underscores
 	re := regexp.MustCompile(regexExp)
